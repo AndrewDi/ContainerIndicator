@@ -24,11 +24,3 @@
 - macOS 13.0 或更高版本
 - 需要安装 `container` 命令行工具
 
-## 安装
-
-### 从源码构建
-
-1. 克隆项目：
-```bash
-git clone <repository-url>
-cd ContainerIndicator

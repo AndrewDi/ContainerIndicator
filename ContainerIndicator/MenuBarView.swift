@@ -6,52 +6,88 @@ struct MenuBarView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Docker 状态
             HStack {
-                Image(systemName: manager.isDockerRunning ? "checkmark.circle.fill" : "xmark.circle.fill")
-                    .foregroundStyle(manager.isDockerRunning ? .green : .red)
-                Text(manager.isDockerRunning ? "Docker 运行中" : "Docker 未运行")
-                    .fontWeight(.semibold)
+                Label(String(localized: "menu.system_status \(manager.systemStatus.displayName)"), systemImage: "circle.dashed.inset.fill")
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
             
             Divider()
             
-            // 容器列表
-            if manager.isDockerRunning {
+            if manager.systemStatus == .running {
+                Button {
+                    Task { await manager.stopSystem() }
+                } label: {
+                    Label(String(localized: "menu.stop_system"), systemImage: "stop.circle")
+                }
+                .disabled(manager.isLoading)
+            } else {
+                Button {
+                    Task { await manager.startSystem() }
+                } label: {
+                    Label(String(localized: "menu.start_system"), systemImage: "play.circle")
+                }
+                .disabled(manager.isLoading)
+            }
+            
+            Divider()
+            
+            if manager.systemStatus == .running {
                 if manager.containers.isEmpty {
-                    Text("暂无容器")
+                    Text(String(localized: "menu.no_containers"))
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
                 } else {
+                    Text(String(localized: "menu.containers_count \(manager.containers.count)"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 12)
+                        .padding(.top, 4)
+                    
                     ForEach(manager.containers) { container in
                         ContainerMenuItem(container: container)
+                    }
+                }
+                
+                if manager.machines.isEmpty {
+                    Text(String(localized: "menu.no_machines"))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                } else {
+                    Divider()
+                    
+                    Text(String(localized: "menu.machines_count \(manager.machines.count)"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 12)
+                        .padding(.top, 4)
+                    
+                    ForEach(manager.machines) { machine in
+                        MachineMenuItem(machine: machine)
                     }
                 }
                 
                 Divider()
             }
             
-            // 操作按钮
             Button {
-                Task { await manager.checkDockerStatus() }
+                Task { await manager.checkSystemStatus() }
             } label: {
-                Label("刷新", systemImage: "arrow.clockwise")
+                Label(String(localized: "menu.refresh"), systemImage: "arrow.clockwise")
             }
             .disabled(manager.isLoading)
             
             Button {
                 openWindow(id: "main")
+                NSApp.activate(ignoringOtherApps: true)
             } label: {
-                Label("容器管理...", systemImage: "square.grid.2x2")
+                Label(String(localized: "menu.container_management"), systemImage: "square.grid.2x2")
             }
             .keyboardShortcut(",")
             
             Divider()
             
-            Button("退出 ContainerIndicator") {
+            Button(String(localized: "menu.quit")) {
                 NSApp.terminate(nil)
             }
             .keyboardShortcut("q")
@@ -65,28 +101,66 @@ struct ContainerMenuItem: View {
     
     var body: some View {
         Menu {
+            Text(String(localized: "container.image \(container.image)"))
+            Text(String(localized: "container.hostname \(container.hostname)"))
+            Text(String(localized: "container.cpu \(container.totalCpus)"))
+            Text(String(localized: "container.memory \(container.memoryFormatted)"))
+            Text(String(localized: "container.platform \(container.platform)"))
+            
+            Divider()
+            
             if container.status == .running {
-                Button("停止") {
+                Button(String(localized: "container.stop")) {
                     Task { await manager.stopContainer(container) }
                 }
-                Button("重启") {
-                    Task { await manager.restartContainer(container) }
-                }
             } else {
-                Button("启动") {
+                Button(String(localized: "container.start")) {
                     Task { await manager.startContainer(container) }
                 }
             }
         } label: {
             HStack {
-                Circle()
-                    .fill(container.status == .running ? .green : .gray)
-                    .frame(width: 8, height: 8)
+                Image(systemName: container.status == .running ? "cube.fill" : "cube")
+                    .font(.caption)
                 Text(container.name)
                 Spacer()
                 Text(container.statusText)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
+struct MachineMenuItem: View {
+    @Environment(ContainerManager.self) private var manager
+    let machine: MachineInfo
+    
+    var body: some View {
+        Menu {
+            Text(String(localized: "machine.cpu \(machine.cpus)"))
+            Text(String(localized: "machine.memory \(machine.memoryFormatted)"))
+            Text(String(localized: "machine.disk \(machine.diskSizeFormatted)"))
+            Text(String(localized: "machine.created \(machine.createdDateFormatted)"))
+            if machine.isDefault {
+                Text(String(localized: "machine.default"))
+            }
+            if machine.status == .running {
+                Button(String(localized: "machine.stop")) {
+                    Task { await manager.stopMachine(machine) }
+                }
+            } else {
+                Button(String(localized: "machine.start")) {
+                    Task { await manager.startMachine(machine) }
+                }
+            }
+        } label: {
+            HStack {
+                Image(systemName: machine.status == .running ? "desktopcomputer" : "server.rack")
+                    .font(.caption)
+                Text(machine.name)
+                Spacer()
+                Text(machine.statusText)
+                    .font(.caption)
             }
         }
     }

@@ -4,19 +4,54 @@ import Observation
 @MainActor
 @Observable
 class ContainerManager {
-    var isDockerRunning = false
+    var systemStatus: SystemStatus = .unknown
     var containers: [ContainerInfo] = []
+    var machines: [MachineInfo] = []
+    var containerStats: [String: [ContainerStat]] = [:]
     var isLoading = false
     var errorMessage: String?
     
-    var runningCount: Int {
+    var runningContainerCount: Int {
         containers.filter { $0.status == .running }.count
     }
     
+    var runningMachineCount: Int {
+        machines.filter { $0.status == .running }.count
+    }
+    
+    var totalRunningCount: Int {
+        runningContainerCount + runningMachineCount
+    }
+    
+    private var containerPath: String?
+    private var statsTask: Task<Void, Never>?
+    
     init() {
         Task {
-            await checkDockerStatus()
+            await findContainerCommand()
+            await checkSystemStatus()
             startAutoRefresh()
+        }
+    }
+    
+    private func findContainerCommand() async {
+        let possiblePaths = [
+            "/opt/homebrew/bin/container",
+            "/usr/local/bin/container",
+            "/usr/bin/container",
+            "\(NSHomeDirectory())/.local/bin/container"
+        ]
+        
+        for path in possiblePaths {
+            if FileManager.default.fileExists(atPath: path) {
+                containerPath = path
+                return
+            }
+        }
+        
+        if let result = try? await executeCommand("/usr/bin/which", arguments: ["container"]),
+           result.exitCode == 0 && !result.output.isEmpty {
+            containerPath = result.output.trimmingCharacters(in: .whitespacesAndNewlines)
         }
     }
     
@@ -24,123 +59,452 @@ class ContainerManager {
         Task {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(5))
-                await checkDockerStatus()
+                await silentCheckSystemStatus()
             }
         }
     }
     
-    func checkDockerStatus() async {
+    func startStatsCollection() {
+        statsTask?.cancel()
+        statsTask = Task {
+            while !Task.isCancelled {
+                await refreshContainerStats()
+                try? await Task.sleep(for: .seconds(2))
+            }
+        }
+    }
+    
+    func stopStatsCollection() {
+        statsTask?.cancel()
+        statsTask = nil
+    }
+    
+    private func refreshContainerStats() async {
+        guard systemStatus == .running, let commandPath = containerPath else { return }
+        
+        let runningContainers = containers.filter { $0.status == .running }
+        guard !runningContainers.isEmpty else { return }
+        
+        do {
+            let result = try await executeCommand(commandPath, arguments: ["stats", "--no-stream", "--format", "json"])
+            
+            if result.exitCode == 0 && !result.output.isEmpty {
+                if let data = result.output.data(using: .utf8),
+                   let jsonArray = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
+                    
+                    let timestamp = Date()
+                    
+                    for item in jsonArray {
+                        guard let id = item["id"] as? String else { continue }
+                        
+                        let stat = ContainerStat(
+                            timestamp: timestamp,
+                            blockReadBytes: item["blockReadBytes"] as? Int ?? 0,
+                            blockWriteBytes: item["blockWriteBytes"] as? Int ?? 0,
+                            cpuUsageUsec: item["cpuUsageUsec"] as? Int ?? 0,
+                            memoryLimitBytes: item["memoryLimitBytes"] as? Int ?? 0,
+                            memoryUsageBytes: item["memoryUsageBytes"] as? Int ?? 0,
+                            networkRxBytes: item["networkRxBytes"] as? Int ?? 0,
+                            networkTxBytes: item["networkTxBytes"] as? Int ?? 0,
+                            numProcesses: item["numProcesses"] as? Int ?? 0
+                        )
+                        
+                        if containerStats[id] == nil {
+                            containerStats[id] = []
+                        }
+                        
+                        containerStats[id]?.append(stat)
+                        
+                        if containerStats[id]!.count > 60 {
+                            containerStats[id]!.removeFirst()
+                        }
+                    }
+                }
+            }
+        } catch {
+        }
+    }
+    
+    func getStats(for containerId: String) -> [ContainerStat] {
+        return containerStats[containerId] ?? []
+    }
+    
+    private func silentCheckSystemStatus() async {
+        guard let commandPath = containerPath else {
+            let newStatus: SystemStatus = .unknown
+            if systemStatus != newStatus {
+                systemStatus = newStatus
+            }
+            return
+        }
+        
+        do {
+            let result = try await executeCommand(commandPath, arguments: ["system", "status", "--format", "json"])
+            
+            if result.exitCode == 0 {
+                if let data = result.output.data(using: .utf8),
+                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let status = json["status"] as? String {
+                    
+                    let newStatus = SystemStatus(rawValue: status) ?? .unknown
+                    if systemStatus != newStatus {
+                        systemStatus = newStatus
+                    }
+                    
+                    if systemStatus == .running {
+                        await silentRefreshContainers()
+                        await silentRefreshMachines()
+                        
+                        if runningContainerCount > 0 {
+                            if statsTask == nil {
+                                startStatsCollection()
+                            }
+                        } else {
+                            stopStatsCollection()
+                            containerStats.removeAll()
+                        }
+                    } else {
+                        if !containers.isEmpty { containers = [] }
+                        if !machines.isEmpty { machines = [] }
+                        stopStatsCollection()
+                        containerStats.removeAll()
+                    }
+                }
+            } else if result.exitCode == 1 {
+                let newStatus: SystemStatus = .stopped
+                if systemStatus != newStatus {
+                    systemStatus = newStatus
+                }
+                if !containers.isEmpty { containers = [] }
+                if !machines.isEmpty { machines = [] }
+                stopStatsCollection()
+                containerStats.removeAll()
+            }
+        } catch {
+            let newStatus: SystemStatus = .unknown
+            if systemStatus != newStatus {
+                systemStatus = newStatus
+            }
+            if !containers.isEmpty { containers = [] }
+            if !machines.isEmpty { machines = [] }
+            stopStatsCollection()
+            containerStats.removeAll()
+        }
+    }
+    
+    private func silentRefreshContainers() async {
+        guard systemStatus == .running, let commandPath = containerPath else { return }
+        
+        do {
+            let result = try await executeCommand(commandPath, arguments: ["list", "--all", "--format", "json"])
+            
+            if result.exitCode == 0 && !result.output.isEmpty {
+                if let data = result.output.data(using: .utf8),
+                   let jsonArray = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
+                    
+                    let newContainers = jsonArray.compactMap { item -> ContainerInfo? in
+                        guard let id = item["id"] as? String else { return nil }
+                        
+                        let configuration = item["configuration"] as? [String: Any]
+                        let name = configuration?["id"] as? String ?? id
+                        
+                        let image = configuration?["image"] as? [String: Any]
+                        let imageRef = image?["reference"] as? String ?? ""
+                        
+                        let status = item["status"] as? [String: Any]
+                        let state = status?["state"] as? String ?? "stopped"
+                        
+                        let networks = configuration?["networks"] as? [[String: Any]]
+                        let firstNetwork = networks?.first
+                        let networkOptions = firstNetwork?["options"] as? [String: Any]
+                        let hostname = networkOptions?["hostname"] as? String ?? ""
+                        
+                        let resources = configuration?["resources"] as? [String: Any]
+                        let cpus = resources?["cpus"] as? Int ?? 0
+                        let cpuOverhead = resources?["cpuOverhead"] as? Int ?? 0
+                        let memoryInBytes = resources?["memoryInBytes"] as? Int ?? 0
+                        
+                        let platform = configuration?["platform"] as? [String: Any]
+                        let architecture = platform?["architecture"] as? String ?? ""
+                        let os = platform?["os"] as? String ?? ""
+                        
+                        return ContainerInfo(
+                            id: id, name: name,
+                            status: state.lowercased() == "running" ? .running : .stopped,
+                            statusText: state, image: imageRef, hostname: hostname,
+                            cpus: cpus, cpuOverhead: cpuOverhead,
+                            memoryInBytes: memoryInBytes,
+                            architecture: architecture, os: os
+                        )
+                    }
+                    
+                    if containers != newContainers {
+                        containers = newContainers
+                        let currentIds = Set(containers.map { $0.id })
+                        containerStats = containerStats.filter { currentIds.contains($0.key) }
+                    }
+                }
+            } else {
+                if !containers.isEmpty { containers = [] }
+            }
+        } catch {
+        }
+    }
+    
+    private func silentRefreshMachines() async {
+        guard systemStatus == .running, let commandPath = containerPath else { return }
+        
+        do {
+            let result = try await executeCommand(commandPath, arguments: ["machine", "list", "--format", "json"])
+            
+            if result.exitCode == 0 && !result.output.isEmpty {
+                if let data = result.output.data(using: .utf8),
+                   let jsonArray = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
+                    
+                    let newMachines = jsonArray.compactMap { item -> MachineInfo? in
+                        guard let id = item["id"] as? String,
+                              let status = item["status"] as? String else { return nil }
+                        
+                        let createdDate = item["createdDate"] as? String ?? ""
+                        let cpus = item["cpus"] as? Int ?? 0
+                        let memory = item["memory"] as? Int ?? 0
+                        let diskSize = item["diskSize"] as? Int ?? 0
+                        let isDefault = item["default"] as? Bool ?? false
+                        
+                        return MachineInfo(
+                            id: id, name: id,
+                            status: status.lowercased() == "running" ? .running : .stopped,
+                            statusText: status, createdDate: createdDate,
+                            cpus: cpus, memory: memory, diskSize: diskSize,
+                            isDefault: isDefault
+                        )
+                    }
+                    
+                    if machines != newMachines {
+                        machines = newMachines
+                    }
+                }
+            } else {
+                if !machines.isEmpty { machines = [] }
+            }
+        } catch {
+        }
+    }
+    
+    func checkSystemStatus() async {
         isLoading = true
         defer { isLoading = false }
         
+        guard let commandPath = containerPath else {
+            errorMessage = String(localized: "error.command_not_found")
+            let newStatus: SystemStatus = .unknown
+            if systemStatus != newStatus {
+                systemStatus = newStatus
+            }
+            return
+        }
+        
         do {
-            let result = try await runCommand("docker", "info", "--format", "{{.ServerVersion}}")
-            isDockerRunning = result.exitCode == 0
+            let result = try await executeCommand(commandPath, arguments: ["system", "status", "--format", "json"])
             
-            if isDockerRunning {
-                await refreshContainers()
-            } else {
-                containers = []
+            if result.exitCode == 0 {
+                if let data = result.output.data(using: .utf8),
+                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let status = json["status"] as? String {
+                    
+                    let newStatus = SystemStatus(rawValue: status) ?? .unknown
+                    if systemStatus != newStatus {
+                        systemStatus = newStatus
+                    }
+                    
+                    if systemStatus == .running {
+                        await refreshContainers()
+                        await refreshMachines()
+                    } else {
+                        if !containers.isEmpty { containers = [] }
+                        if !machines.isEmpty { machines = [] }
+                    }
+                }
+            } else if result.exitCode == 1 {
+                let newStatus: SystemStatus = .stopped
+                if systemStatus != newStatus {
+                    systemStatus = newStatus
+                }
+                if !containers.isEmpty { containers = [] }
+                if !machines.isEmpty { machines = [] }
             }
         } catch {
-            errorMessage = "检查 Docker 状态失败: \(error.localizedDescription)"
-            isDockerRunning = false
-            containers = []
+            errorMessage = String(localized: "error.check_status_failed \(error.localizedDescription)")
+            let newStatus: SystemStatus = .unknown
+            if systemStatus != newStatus {
+                systemStatus = newStatus
+            }
+            if !containers.isEmpty { containers = [] }
+            if !machines.isEmpty { machines = [] }
         }
     }
     
     func refreshContainers() async {
-        guard isDockerRunning else { return }
+        guard systemStatus == .running, let commandPath = containerPath else { return }
         
         do {
-            let result = try await runCommand(
-                "docker", "ps", "-a",
-                "--format", "{{.ID}}|{{.Names}}|{{.Status}}|{{.Image}}"
-            )
+            let result = try await executeCommand(commandPath, arguments: ["list", "--all", "--format", "json"])
             
-            if result.exitCode == 0 {
-                containers = result.output
-                    .split(separator: "\n")
-                    .filter { !$0.isEmpty }
-                    .compactMap { line in
-                        let parts = line.split(separator: "|")
-                        guard parts.count >= 4 else { return nil }
+            if result.exitCode == 0 && !result.output.isEmpty {
+                if let data = result.output.data(using: .utf8),
+                   let jsonArray = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
+                    
+                    let newContainers = jsonArray.compactMap { item -> ContainerInfo? in
+                        guard let id = item["id"] as? String else { return nil }
                         
-                        let status = String(parts[2])
-                        let containerStatus: ContainerStatus = status.lowercased().contains("up") ? .running : .stopped
+                        let configuration = item["configuration"] as? [String: Any]
+                        let name = configuration?["id"] as? String ?? id
+                        
+                        let image = configuration?["image"] as? [String: Any]
+                        let imageRef = image?["reference"] as? String ?? ""
+                        
+                        let status = item["status"] as? [String: Any]
+                        let state = status?["state"] as? String ?? "stopped"
+                        
+                        let networks = configuration?["networks"] as? [[String: Any]]
+                        let firstNetwork = networks?.first
+                        let networkOptions = firstNetwork?["options"] as? [String: Any]
+                        let hostname = networkOptions?["hostname"] as? String ?? ""
+                        
+                        let resources = configuration?["resources"] as? [String: Any]
+                        let cpus = resources?["cpus"] as? Int ?? 0
+                        let cpuOverhead = resources?["cpuOverhead"] as? Int ?? 0
+                        let memoryInBytes = resources?["memoryInBytes"] as? Int ?? 0
+                        
+                        let platform = configuration?["platform"] as? [String: Any]
+                        let architecture = platform?["architecture"] as? String ?? ""
+                        let os = platform?["os"] as? String ?? ""
                         
                         return ContainerInfo(
-                            id: String(parts[0]),
-                            name: String(parts[1]),
-                            status: containerStatus,
-                            image: String(parts[3]),
-                            statusText: status
+                            id: id, name: name,
+                            status: state.lowercased() == "running" ? .running : .stopped,
+                            statusText: state, image: imageRef, hostname: hostname,
+                            cpus: cpus, cpuOverhead: cpuOverhead,
+                            memoryInBytes: memoryInBytes,
+                            architecture: architecture, os: os
                         )
                     }
+                    
+                    if containers != newContainers {
+                        containers = newContainers
+                    }
+                }
+            } else {
+                if !containers.isEmpty { containers = [] }
             }
         } catch {
-            errorMessage = "刷新容器列表失败: \(error.localizedDescription)"
+            errorMessage = String(localized: "error.refresh_containers_failed \(error.localizedDescription)")
         }
+    }
+    
+    func refreshMachines() async {
+        guard systemStatus == .running, let commandPath = containerPath else { return }
+        
+        do {
+            let result = try await executeCommand(commandPath, arguments: ["machine", "list", "--format", "json"])
+            
+            if result.exitCode == 0 && !result.output.isEmpty {
+                if let data = result.output.data(using: .utf8),
+                   let jsonArray = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
+                    
+                    let newMachines = jsonArray.compactMap { item -> MachineInfo? in
+                        guard let id = item["id"] as? String,
+                              let status = item["status"] as? String else { return nil }
+                        
+                        let createdDate = item["createdDate"] as? String ?? ""
+                        let cpus = item["cpus"] as? Int ?? 0
+                        let memory = item["memory"] as? Int ?? 0
+                        let diskSize = item["diskSize"] as? Int ?? 0
+                        let isDefault = item["default"] as? Bool ?? false
+                        
+                        return MachineInfo(
+                            id: id, name: id,
+                            status: status.lowercased() == "running" ? .running : .stopped,
+                            statusText: status, createdDate: createdDate,
+                            cpus: cpus, memory: memory, diskSize: diskSize,
+                            isDefault: isDefault
+                        )
+                    }
+                    
+                    if machines != newMachines {
+                        machines = newMachines
+                    }
+                }
+            } else {
+                if !machines.isEmpty { machines = [] }
+            }
+        } catch {
+            errorMessage = String(localized: "error.refresh_machines_failed \(error.localizedDescription)")
+        }
+    }
+    
+    func startSystem() async {
+        await executeContainerCommand(["system", "start"])
+    }
+    
+    func stopSystem() async {
+        await executeContainerCommand(["system", "stop"])
     }
     
     func startContainer(_ container: ContainerInfo) async {
-        guard isDockerRunning else { return }
-        
-        isLoading = true
-        defer { isLoading = false }
-        
-        do {
-            let result = try await runCommand("docker", "start", container.id)
-            if result.exitCode == 0 {
-                await refreshContainers()
-            } else {
-                errorMessage = "启动容器失败: \(result.error)"
-            }
-        } catch {
-            errorMessage = "启动容器失败: \(error.localizedDescription)"
-        }
+        await executeContainerCommand(["start", container.id])
     }
     
     func stopContainer(_ container: ContainerInfo) async {
-        guard isDockerRunning else { return }
+        await executeContainerCommand(["stop", container.id])
+    }
+    
+    func startMachine(_ machine: MachineInfo) async {
+        await executeContainerCommand(["machine", "run", "-n", machine.name, "-d"])
+    }
+    
+    func stopMachine(_ machine: MachineInfo) async {
+        await executeContainerCommand(["machine", "stop", machine.id])
+    }
+    
+    private func executeContainerCommand(_ arguments: [String]) async {
+        guard let commandPath = containerPath else {
+            errorMessage = String(localized: "error.command_not_found")
+            return
+        }
         
         isLoading = true
         defer { isLoading = false }
         
         do {
-            let result = try await runCommand("docker", "stop", container.id)
+            let result = try await executeCommand(commandPath, arguments: arguments)
             if result.exitCode == 0 {
-                await refreshContainers()
+                await checkSystemStatus()
             } else {
-                errorMessage = "停止容器失败: \(result.error)"
+                errorMessage = String(localized: "error.command_failed \(result.error)")
             }
         } catch {
-            errorMessage = "停止容器失败: \(error.localizedDescription)"
+            errorMessage = String(localized: "error.execution_failed \(error.localizedDescription)")
         }
     }
     
-    func restartContainer(_ container: ContainerInfo) async {
-        guard isDockerRunning else { return }
-        
-        isLoading = true
-        defer { isLoading = false }
-        
-        do {
-            let result = try await runCommand("docker", "restart", container.id)
-            if result.exitCode == 0 {
-                await refreshContainers()
-            } else {
-                errorMessage = "重启容器失败: \(result.error)"
-            }
-        } catch {
-            errorMessage = "重启容器失败: \(error.localizedDescription)"
-        }
-    }
-    
-    private func runCommand(_ command: String, _ arguments: String...) async throws -> CommandResult {
+    private func executeCommand(_ path: String, arguments: [String]) async throws -> CommandResult {
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        process.arguments = [command] + arguments
+        process.executableURL = URL(fileURLWithPath: path)
+        process.arguments = arguments
+        
+        var env = ProcessInfo.processInfo.environment
+        let paths = [
+            "/opt/homebrew/bin",
+            "/usr/local/bin",
+            "/usr/bin",
+            "/bin",
+            "/usr/sbin",
+            "/sbin",
+            "\(NSHomeDirectory())/.local/bin"
+        ]
+        env["PATH"] = (paths + [env["PATH"] ?? ""]).joined(separator: ":")
+        process.environment = env
         
         let outputPipe = Pipe()
         let errorPipe = Pipe()
@@ -170,15 +534,118 @@ struct CommandResult {
     let error: String
 }
 
-struct ContainerInfo: Identifiable {
+struct ContainerStat: Identifiable {
+    let id = UUID()
+    let timestamp: Date
+    let blockReadBytes: Int
+    let blockWriteBytes: Int
+    let cpuUsageUsec: Int
+    let memoryLimitBytes: Int
+    let memoryUsageBytes: Int
+    let networkRxBytes: Int
+    let networkTxBytes: Int
+    let numProcesses: Int
+    
+    var ioTotal: Int {
+        blockReadBytes + blockWriteBytes
+    }
+    
+    var networkTotal: Int {
+        networkRxBytes + networkTxBytes
+    }
+    
+    var memoryPercentage: Double {
+        guard memoryLimitBytes > 0 else { return 0 }
+        return Double(memoryUsageBytes) / Double(memoryLimitBytes) * 100
+    }
+}
+
+struct ContainerInfo: Identifiable, Equatable {
     let id: String
     let name: String
     let status: ContainerStatus
-    let image: String
     let statusText: String
+    let image: String
+    let hostname: String
+    let cpus: Int
+    let cpuOverhead: Int
+    let memoryInBytes: Int
+    let architecture: String
+    let os: String
+    
+    var memoryFormatted: String {
+        let gb = Double(memoryInBytes) / 1_073_741_824
+        return String(format: "%.1f GB", gb)
+    }
+    
+    var totalCpus: Int {
+        cpus * cpuOverhead
+    }
+    
+    var platform: String {
+        "\(os)/\(architecture)"
+    }
 }
 
-enum ContainerStatus {
+struct MachineInfo: Identifiable, Equatable {
+    let id: String
+    let name: String
+    let status: ContainerStatus
+    let statusText: String
+    let createdDate: String
+    let cpus: Int
+    let memory: Int
+    let diskSize: Int
+    let isDefault: Bool
+    
+    var memoryFormatted: String {
+        let gb = Double(memory) / 1_073_741_824
+        return String(format: "%.1f GB", gb)
+    }
+    
+    var diskSizeFormatted: String {
+        let gb = Double(diskSize) / 1_073_741_824
+        return String(format: "%.1f GB", gb)
+    }
+    
+    var createdDateFormatted: String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        guard let date = formatter.date(from: createdDate) else {
+            return createdDate
+        }
+        let displayFormatter = DateFormatter()
+        displayFormatter.dateFormat = "yyyy-MM-dd HH:mm"
+        return displayFormatter.string(from: date)
+    }
+}
+
+enum ContainerStatus: Equatable {
     case running
     case stopped
+}
+
+enum SystemStatus: String, Equatable {
+    case running
+    case stopped
+    case unregistered
+    case unknown
+    
+    var displayName: String {
+        switch self {
+        case .running: return String(localized: "status.running")
+        case .stopped: return String(localized: "status.stopped")
+        case .unregistered: return String(localized: "status.unregistered")
+        case .unknown: return String(localized: "status.unknown")
+        }
+    }
+    
+    var iconName: String {
+        switch self {
+        case .running: return "cube.fill"
+        case .stopped: return "cube"
+        case .unregistered: return "cube.transparent"
+        case .unknown: return "questionmark.circle"
+        }
+    }
 }
