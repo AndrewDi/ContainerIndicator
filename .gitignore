@@ -1,1 +1,2 @@
-ContainerIndicator.xcodeproj
+*.xcodeproj
+*.dmg
