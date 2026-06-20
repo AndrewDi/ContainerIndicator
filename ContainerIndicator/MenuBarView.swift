@@ -14,16 +14,14 @@ struct MenuBarView: View {
             
             if manager.systemStatus == .running {
                 Button {
-                    Task { @MainActor in
-                        await manager.stopSystem() }
+                    Task { await manager.stopSystem() }
                 } label: {
                     Label(String(localized: "menu.stop_system"), systemImage: "stop.circle")
                 }
                 .disabled(manager.isLoading)
             } else {
                 Button {
-                    Task { @MainActor in
-                        await manager.startSystem() }
+                    Task { await manager.startSystem() }
                 } label: {
                     Label(String(localized: "menu.start_system"), systemImage: "play.circle")
                 }
@@ -73,8 +71,7 @@ struct MenuBarView: View {
             }
             
             Button {
-                Task { @MainActor in
-                    await manager.checkSystemStatus() }
+                Task { await manager.checkSystemStatus() }
             } label: {
                 Label(String(localized: "menu.refresh"), systemImage: "arrow.clockwise")
             }
@@ -114,13 +111,11 @@ struct ContainerMenuItem: View {
             
             if container.status == .running {
                 Button(String(localized: "container.stop")) {
-                    Task { @MainActor in
-                        await manager.stopContainer(container) }
+                    Task { await manager.stopContainer(container) }
                 }
             } else {
                 Button(String(localized: "container.start")) {
-                    Task { @MainActor in
-                        await manager.startContainer(container) }
+                    Task { await manager.startContainer(container) }
                 }
             }
         } label: {
@@ -151,13 +146,11 @@ struct MachineMenuItem: View {
             }
             if machine.status == .running {
                 Button(String(localized: "machine.stop")) {
-                    Task { @MainActor in
-                        await manager.stopMachine(machine) }
+                    Task { await manager.stopMachine(machine) }
                 }
             } else {
                 Button(String(localized: "machine.start")) {
-                    Task { @MainActor in
-                        await manager.startMachine(machine) }
+                    Task { await manager.startMachine(machine) }
                 }
             }
         } label: {
