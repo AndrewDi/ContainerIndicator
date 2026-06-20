@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import UserNotifications
 
 @MainActor
 @Observable
@@ -28,10 +29,31 @@ class ContainerManager {
     
     init() {
         Task {
+            await requestNotificationPermission()
             await findContainerCommand()
             await checkSystemStatus()
             startAutoRefresh()
         }
+    }
+    
+    private func requestNotificationPermission() async {
+        let center = UNUserNotificationCenter.current()
+        _ = try? await center.requestAuthorization(options: [.alert, .sound, .badge])
+    }
+    
+    private func sendNotification(title: String, body: String) {
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = .default
+        
+        let request = UNNotificationRequest(
+            identifier: UUID().uuidString,
+            content: content,
+            trigger: nil
+        )
+        
+        UNUserNotificationCenter.current().add(request)
     }
     
     private func findContainerCommand() async {
@@ -444,32 +466,75 @@ class ContainerManager {
     }
     
     func startSystem() async {
-        await executeContainerCommand(["system", "start"])
+        await executeContainerCommand(
+            ["system", "start"],
+            successTitle: String(localized: "notification.system_started_title"),
+            successBody: String(localized: "notification.system_started_body"),
+            failureTitle: String(localized: "notification.system_start_failed_title"),
+            failureBody: String(localized: "notification.system_start_failed_body")
+        )
     }
     
     func stopSystem() async {
-        await executeContainerCommand(["system", "stop"])
+        await executeContainerCommand(
+            ["system", "stop"],
+            successTitle: String(localized: "notification.system_stopped_title"),
+            successBody: String(localized: "notification.system_stopped_body"),
+            failureTitle: String(localized: "notification.system_stop_failed_title"),
+            failureBody: String(localized: "notification.system_stop_failed_body")
+        )
     }
     
     func startContainer(_ container: ContainerInfo) async {
-        await executeContainerCommand(["start", container.id])
+        await executeContainerCommand(
+            ["start", container.id],
+            successTitle: String(localized: "notification.container_started_title"),
+            successBody: String(localized: "notification.container_started_body \(container.name)"),
+            failureTitle: String(localized: "notification.container_start_failed_title"),
+            failureBody: String(localized: "notification.container_start_failed_body \(container.name)")
+        )
     }
     
     func stopContainer(_ container: ContainerInfo) async {
-        await executeContainerCommand(["stop", container.id])
+        await executeContainerCommand(
+            ["stop", container.id],
+            successTitle: String(localized: "notification.container_stopped_title"),
+            successBody: String(localized: "notification.container_stopped_body \(container.name)"),
+            failureTitle: String(localized: "notification.container_stop_failed_title"),
+            failureBody: String(localized: "notification.container_stop_failed_body \(container.name)")
+        )
     }
     
     func startMachine(_ machine: MachineInfo) async {
-        await executeContainerCommand(["machine", "run", "-n", machine.name, "-d"])
+        await executeContainerCommand(
+            ["machine", "run", "-n", machine.name, "-d"],
+            successTitle: String(localized: "notification.machine_started_title"),
+            successBody: String(localized: "notification.machine_started_body \(machine.name)"),
+            failureTitle: String(localized: "notification.machine_start_failed_title"),
+            failureBody: String(localized: "notification.machine_start_failed_body \(machine.name)")
+        )
     }
     
     func stopMachine(_ machine: MachineInfo) async {
-        await executeContainerCommand(["machine", "stop", machine.id])
+        await executeContainerCommand(
+            ["machine", "stop", machine.id],
+            successTitle: String(localized: "notification.machine_stopped_title"),
+            successBody: String(localized: "notification.machine_stopped_body \(machine.name)"),
+            failureTitle: String(localized: "notification.machine_stop_failed_title"),
+            failureBody: String(localized: "notification.machine_stop_failed_body \(machine.name)")
+        )
     }
     
-    private func executeContainerCommand(_ arguments: [String]) async {
+    private func executeContainerCommand(
+        _ arguments: [String],
+        successTitle: String,
+        successBody: String,
+        failureTitle: String,
+        failureBody: String
+    ) async {
         guard let commandPath = containerPath else {
             errorMessage = String(localized: "error.command_not_found")
+            sendNotification(title: failureTitle, body: failureBody)
             return
         }
         
@@ -479,12 +544,15 @@ class ContainerManager {
         do {
             let result = try await executeCommand(commandPath, arguments: arguments)
             if result.exitCode == 0 {
+                sendNotification(title: successTitle, body: successBody)
                 await checkSystemStatus()
             } else {
                 errorMessage = String(localized: "error.command_failed \(result.error)")
+                sendNotification(title: failureTitle, body: failureBody)
             }
         } catch {
             errorMessage = String(localized: "error.execution_failed \(error.localizedDescription)")
+            sendNotification(title: failureTitle, body: failureBody)
         }
     }
     
