@@ -71,7 +71,7 @@ struct MenuBarView: View {
             }
             
             Button {
-                Task { await manager.checkSystemStatus() }
+                Task { await manager.silentCheckSystemStatus() }
             } label: {
                 Label(String(localized: "menu.refresh"), systemImage: "arrow.clockwise")
             }
@@ -137,10 +137,12 @@ struct MachineMenuItem: View {
     
     var body: some View {
         Menu {
+            Text(String(localized: "machine.image \(machine.imageReference)"))
             Text(String(localized: "machine.cpu \(machine.cpus)"))
             Text(String(localized: "machine.memory \(machine.memoryFormatted)"))
             Text(String(localized: "machine.disk \(machine.diskSizeFormatted)"))
             Text(String(localized: "machine.created \(machine.createdDateFormatted)"))
+            Text(String(localized: "machine.platform \(machine.platform)"))
             if machine.isDefault {
                 Text(String(localized: "machine.default"))
             }

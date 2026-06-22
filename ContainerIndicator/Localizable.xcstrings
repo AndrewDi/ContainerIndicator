@@ -34,7 +34,14 @@
       }
     },
     "Container" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "容器"
+          }
+        }
+      }
     },
     "container.cpu %lld" : {
       "localizations" : {
@@ -356,22 +363,6 @@
         }
       }
     },
-    "error.check_status_failed %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Failed to check system status: %@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "检查系统状态失败: %@"
-          }
-        }
-      }
-    },
     "error.command_failed %@" : {
       "localizations" : {
         "en" : {
@@ -416,38 +407,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "执行失败: %@"
-          }
-        }
-      }
-    },
-    "error.refresh_containers_failed %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Failed to refresh container list: %@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "刷新容器列表失败: %@"
-          }
-        }
-      }
-    },
-    "error.refresh_machines_failed %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Failed to refresh machine list: %@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "刷新机器列表失败: %@"
           }
         }
       }
@@ -686,6 +645,16 @@
         }
       }
     },
+    "machine.image %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "镜像: %@"
+          }
+        }
+      }
+    },
     "machine.memory %@" : {
       "localizations" : {
         "en" : {
@@ -698,6 +667,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "内存: %@"
+          }
+        }
+      }
+    },
+    "machine.platform %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "平台: %@"
           }
         }
       }

@@ -19,7 +19,7 @@ struct ContentView: View {
                 }
                 
                 Button {
-                    Task { await manager.checkSystemStatus() }
+                    Task { await manager.silentCheckSystemStatus() }
                 } label: {
                     Image(systemName: "arrow.clockwise")
                 }
@@ -134,7 +134,7 @@ struct ContentView: View {
         }
         .frame(minWidth: 650, minHeight: 400)
         .task {
-            await manager.checkSystemStatus()
+            await manager.silentCheckSystemStatus()
         }
     }
 }
