@@ -113,6 +113,9 @@ struct ContainerMenuItem: View {
                 Button(String(localized: "container.stop")) {
                     Task { await manager.stopContainer(container) }
                 }
+                Button(String(localized: "container.restart")) {
+                    Task { await manager.restartContainer(container) }
+                }
             } else {
                 Button(String(localized: "container.start")) {
                     Task { await manager.startContainer(container) }
@@ -149,6 +152,9 @@ struct MachineMenuItem: View {
             if machine.status == .running {
                 Button(String(localized: "machine.stop")) {
                     Task { await manager.stopMachine(machine) }
+                }
+                Button(String(localized: "machine.restart")) {
+                    Task { await manager.restartMachine(machine) }
                 }
             } else {
                 Button(String(localized: "machine.start")) {

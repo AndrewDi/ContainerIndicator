@@ -363,6 +363,35 @@ class ContainerManager {
         )
     }
     
+    func restartContainer(_ container: ContainerInfo) async {
+        let stopped = await executeContainerCommand(
+            ["stop", container.id],
+            successTitle: "",
+            successBody: "",
+            failureTitle: String(localized: "notification.container_restart_failed_title"),
+            failureBody: String(localized: "notification.container_restart_failed_body \(container.name)"),
+            showNotification: false
+        )
+        
+        guard stopped else { return }
+        
+        let started = await executeContainerCommand(
+            ["start", container.id],
+            successTitle: "",
+            successBody: "",
+            failureTitle: String(localized: "notification.container_restart_failed_title"),
+            failureBody: String(localized: "notification.container_restart_failed_body \(container.name)"),
+            showNotification: false
+        )
+        
+        if started {
+            sendNotification(
+                title: String(localized: "notification.container_restarted_title"),
+                body: String(localized: "notification.container_restarted_body \(container.name)")
+            )
+        }
+    }
+    
     func startMachine(_ machine: MachineInfo) async {
         await executeContainerCommand(
             ["machine", "run", "-n", machine.name, "-d"],
@@ -383,17 +412,50 @@ class ContainerManager {
         )
     }
     
+    func restartMachine(_ machine: MachineInfo) async {
+        let stopped = await executeContainerCommand(
+            ["machine", "stop", machine.id],
+            successTitle: "",
+            successBody: "",
+            failureTitle: String(localized: "notification.machine_restart_failed_title"),
+            failureBody: String(localized: "notification.machine_restart_failed_body \(machine.name)"),
+            showNotification: false
+        )
+        
+        guard stopped else { return }
+        
+        let started = await executeContainerCommand(
+            ["machine", "run", "-n", machine.name, "-d"],
+            successTitle: "",
+            successBody: "",
+            failureTitle: String(localized: "notification.machine_restart_failed_title"),
+            failureBody: String(localized: "notification.machine_restart_failed_body \(machine.name)"),
+            showNotification: false
+        )
+        
+        if started {
+            sendNotification(
+                title: String(localized: "notification.machine_restarted_title"),
+                body: String(localized: "notification.machine_restarted_body \(machine.name)")
+            )
+        }
+    }
+    
+    @discardableResult
     private func executeContainerCommand(
         _ arguments: [String],
         successTitle: String,
         successBody: String,
         failureTitle: String,
-        failureBody: String
-    ) async {
+        failureBody: String,
+        showNotification: Bool = true
+    ) async -> Bool {
         guard let commandPath = containerPath else {
             errorMessage = String(localized: "error.command_not_found")
-            sendNotification(title: failureTitle, body: failureBody)
-            return
+            if showNotification {
+                sendNotification(title: failureTitle, body: failureBody)
+            }
+            return false
         }
         
         isLoading = true
@@ -402,15 +464,24 @@ class ContainerManager {
         do {
             let result = try await executeCommand(commandPath, arguments: arguments)
             if result.exitCode == 0 {
-                sendNotification(title: successTitle, body: successBody)
+                if showNotification {
+                    sendNotification(title: successTitle, body: successBody)
+                }
                 await silentCheckSystemStatus()
+                return true
             } else {
                 errorMessage = String(localized: "error.command_failed \(result.error)")
-                sendNotification(title: failureTitle, body: failureBody)
+                if showNotification {
+                    sendNotification(title: failureTitle, body: failureBody)
+                }
+                return false
             }
         } catch {
             errorMessage = String(localized: "error.execution_failed \(error.localizedDescription)")
-            sendNotification(title: failureTitle, body: failureBody)
+            if showNotification {
+                sendNotification(title: failureTitle, body: failureBody)
+            }
+            return false
         }
     }
     
