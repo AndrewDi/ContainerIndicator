@@ -229,6 +229,11 @@ struct ContainerRow: View {
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
+                    Button(String(localized: "container.restart")) {
+                        Task { await manager.restartContainer(container) }
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
                 } else {
                     Button(String(localized: "container.start")) {
                         Task { await manager.startContainer(container) }
@@ -475,6 +480,11 @@ struct MachineRow: View {
                 if machine.status == .running {
                     Button(String(localized: "machine.stop")) {
                         Task { await manager.stopMachine(machine) }
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    Button(String(localized: "machine.restart")) {
+                        Task { await manager.restartMachine(machine) }
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
