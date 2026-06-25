@@ -102,50 +102,50 @@ class ContainerManager {
     }
     
     private func refreshContainerStats() async {
-        guard systemStatus == .running, let commandPath = containerPath else { return }
+    guard systemStatus == .running, let commandPath = containerPath else { return }
+    
+    let runningContainers = containers.filter { $0.status == .running }
+    guard !runningContainers.isEmpty else { return }
+    
+    do {
+        let result = try await executeCommand(commandPath, arguments: ["stats", "--no-stream", "--format", "json"])
         
-        let runningContainers = containers.filter { $0.status == .running }
-        guard !runningContainers.isEmpty else { return }
-        
-        do {
-            let result = try await executeCommand(commandPath, arguments: ["stats", "--no-stream", "--format", "json"])
-            
-            if result.exitCode == 0 && !result.output.isEmpty {
-                if let data = result.output.data(using: .utf8),
-                   let jsonArray = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
+        if result.exitCode == 0 && !result.output.isEmpty {
+            if let data = result.output.data(using: .utf8),
+               let jsonArray = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
+                
+                let baseTimestamp = Date()
+                
+                for (index, item) in jsonArray.enumerated() {
+                    guard let id = item["id"] as? String else { continue }
                     
-                    let timestamp = Date()
+                    let stat = ContainerStat(
+                        timestamp: baseTimestamp.addingTimeInterval(TimeInterval(index) * 0.001),
+                        blockReadBytes: item["blockReadBytes"] as? Int ?? 0,
+                        blockWriteBytes: item["blockWriteBytes"] as? Int ?? 0,
+                        cpuUsageUsec: item["cpuUsageUsec"] as? Int ?? 0,
+                        memoryLimitBytes: item["memoryLimitBytes"] as? Int ?? 0,
+                        memoryUsageBytes: item["memoryUsageBytes"] as? Int ?? 0,
+                        networkRxBytes: item["networkRxBytes"] as? Int ?? 0,
+                        networkTxBytes: item["networkTxBytes"] as? Int ?? 0,
+                        numProcesses: item["numProcesses"] as? Int ?? 0
+                    )
                     
-                    for item in jsonArray {
-                        guard let id = item["id"] as? String else { continue }
-                        
-                        let stat = ContainerStat(
-                            timestamp: timestamp,
-                            blockReadBytes: item["blockReadBytes"] as? Int ?? 0,
-                            blockWriteBytes: item["blockWriteBytes"] as? Int ?? 0,
-                            cpuUsageUsec: item["cpuUsageUsec"] as? Int ?? 0,
-                            memoryLimitBytes: item["memoryLimitBytes"] as? Int ?? 0,
-                            memoryUsageBytes: item["memoryUsageBytes"] as? Int ?? 0,
-                            networkRxBytes: item["networkRxBytes"] as? Int ?? 0,
-                            networkTxBytes: item["networkTxBytes"] as? Int ?? 0,
-                            numProcesses: item["numProcesses"] as? Int ?? 0
-                        )
-                        
-                        if containerStats[id] == nil {
-                            containerStats[id] = []
-                        }
-                        
-                        containerStats[id]?.append(stat)
-                        
-                        if containerStats[id]!.count > 60 {
-                            containerStats[id]!.removeFirst()
-                        }
+                    if containerStats[id] == nil {
+                        containerStats[id] = []
+                    }
+                    
+                    containerStats[id]?.append(stat)
+                    
+                    if containerStats[id]!.count > 60 {
+                        containerStats[id]!.removeFirst()
                     }
                 }
             }
-        } catch {
         }
+    } catch {
     }
+}
     
     func getStats(for containerId: String) -> [ContainerStat] {
         return containerStats[containerId] ?? []

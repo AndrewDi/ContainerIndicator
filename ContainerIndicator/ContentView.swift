@@ -173,12 +173,6 @@ struct ContainerRow: View {
                     }
                 }
                 
-                Text(container.id)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                
                 Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 2) {
                     GridRow {
                         Text(String(localized: "label.image"))
@@ -215,12 +209,13 @@ struct ContainerRow: View {
                 }
             }
             
+            Spacer(minLength: 0)
+            
             if container.status == .running {
                 ContainerStatsGridCompact(containerId: container.id)
-                    .frame(minWidth: 169, maxWidth: 480)
+                    .frame(width: 150, height: 72)
+                    .layoutPriority(1)
             }
-            
-            Spacer(minLength: 0)
             
             VStack {
                 if container.status == .running {
@@ -248,86 +243,194 @@ struct ContainerRow: View {
     }
 }
 
+enum StatChartType: String, CaseIterable, Identifiable {
+    case io, cpu, memory, network
+    var id: String { rawValue }
+}
+
+struct ChartConfig {
+    let type: StatChartType
+    let title: String
+    let icon: String
+    let color: Color
+    let unit: MiniStatChart.Unit
+    let value: (ContainerStat) -> Double
+    let format: (ContainerStat) -> String
+}
+
+private func makeChartConfigs(stats: [ContainerStat]) -> [ChartConfig] {
+    return [
+        ChartConfig(
+            type: .io,
+            title: String(localized: "chart.io"),
+            icon: "externaldrive",
+            color: .orange,
+            unit: .bytes,
+            value: { stat in Double(stat.ioTotal) },
+            format: { stat in ContainerStatsGrid.formatBytes(stat.ioTotal) }
+        ),
+        ChartConfig(
+            type: .cpu,
+            title: String(localized: "chart.cpu"),
+            icon: "cpu",
+            color: .blue,
+            unit: .percent,
+            value: { stat in
+                guard stats.count >= 2 else { return 0 }
+                let currentIndex = stats.firstIndex(where: { $0.id == stat.id }) ?? 0
+                guard currentIndex > 0 else { return 0 }
+                let prev = stats[currentIndex - 1]
+                let deltaUsec = Double(stat.cpuUsageUsec - prev.cpuUsageUsec)
+                let deltaTime = stat.timestamp.timeIntervalSince(prev.timestamp)
+                guard deltaTime > 0 else { return 0 }
+                return (deltaUsec / 1_000_000) / deltaTime * 100
+            },
+            format: { stat in
+                guard stats.count >= 2 else { return "0%" }
+                let currentIndex = stats.firstIndex(where: { $0.id == stat.id }) ?? 0
+                guard currentIndex > 0 else { return "0%" }
+                let prev = stats[currentIndex - 1]
+                let deltaUsec = Double(stat.cpuUsageUsec - prev.cpuUsageUsec)
+                let deltaTime = stat.timestamp.timeIntervalSince(prev.timestamp)
+                guard deltaTime > 0 else { return "0%" }
+                let percentage = (deltaUsec / 1_000_000) / deltaTime * 100
+                return String(format: "%.0f%%", percentage)
+            }
+        ),
+        ChartConfig(
+            type: .memory,
+            title: String(localized: "chart.memory"),
+            icon: "memorychip",
+            color: .green,
+            unit: .bytes,
+            value: { stat in Double(stat.memoryUsageBytes) },
+            format: { stat in
+                let pct = stat.memoryPercentage
+                return String(format: "%.0f%%", pct)
+            }
+        ),
+        ChartConfig(
+            type: .network,
+            title: String(localized: "chart.network"),
+            icon: "network",
+            color: .purple,
+            unit: .bytes,
+            value: { stat in Double(stat.networkTotal) },
+            format: { stat in ContainerStatsGrid.formatBytes(stat.networkTotal) }
+        )
+    ]
+}
+
 struct ContainerStatsGridCompact: View {
+    let containerId: String
+    
+    @State private var isHovering = false
+    @State private var selectedChart: StatChartType?
+    @State private var dismissTask: Task<Void, Never>?
+    
+    private enum PopoverContent {
+        case grid
+        case singleChart(StatChartType)
+    }
+    
+    private var popoverContent: PopoverContent? {
+        if let chart = selectedChart {
+            return .singleChart(chart)
+        }
+        if isHovering {
+            return .grid
+        }
+        return nil
+    }
+    
+    var body: some View {
+        ContainerStatsGrid(containerId: containerId, size: .compact, onChartSelected: selectChart)
+            .contentShape(Rectangle())
+            .onHover { setHover($0) }
+            .popover(isPresented: Binding(
+                get: { popoverContent != nil },
+                set: { if !$0 { closePopover() } }
+            )) {
+                popoverBody
+            }
+    }
+    
+    @ViewBuilder
+    private var popoverBody: some View {
+        switch popoverContent {
+        case .grid:
+            ContainerStatsGrid(containerId: containerId, size: .enlarged, onChartSelected: selectChart)
+                .frame(width: 400, height: 280)
+                .padding(16)
+                .onHover { setHover($0) }
+        case .singleChart(let type):
+            SingleStatChart(containerId: containerId, type: type)
+                .frame(width: 520, height: 340)
+                .padding(20)
+                .onHover { setHover($0) }
+        case .none:
+            EmptyView()
+        }
+    }
+    
+    private func setHover(_ value: Bool) {
+        dismissTask?.cancel()
+        if value {
+            isHovering = true
+        } else {
+            dismissTask = Task {
+                try? await Task.sleep(for: .milliseconds(100))
+                isHovering = false
+                selectedChart = nil
+            }
+        }
+    }
+    
+    private func selectChart(_ type: StatChartType) {
+        selectedChart = type
+    }
+    
+    private func closePopover() {
+        isHovering = false
+        selectedChart = nil
+    }
+}
+
+struct ContainerStatsGrid: View {
     @Environment(ContainerManager.self) private var manager
     let containerId: String
-
+    var size: Size = .compact
+    var onChartSelected: ((StatChartType) -> Void)?
+    
+    enum Size {
+        case compact
+        case enlarged
+    }
+    
     var stats: [ContainerStat] {
         manager.getStats(for: containerId)
     }
-
+    
     var body: some View {
         if stats.count >= 2 {
             GeometryReader { geo in
-                let spacing: CGFloat = 4
+                let spacing: CGFloat = size == .compact ? 2 : 8
                 let chartWidth = (geo.size.width - spacing) / 2
                 let chartHeight = (geo.size.height - spacing) / 2
-
+                let configs = makeChartConfigs(stats: stats)
+                
                 VStack(spacing: spacing) {
                     HStack(spacing: spacing) {
-                        MiniStatChart(
-                            icon: "externaldrive",
-                            data: stats,
-                            values: { stat in Double(stat.ioTotal) },
-                            color: .orange,
-                            formatValue: { stat in Self.formatBytes(stat.ioTotal) }
-                        )
-                        .frame(width: chartWidth, height: chartHeight)
-
-                        MiniStatChart(
-                            icon: "cpu",
-                            data: stats,
-                            values: { stat in
-                                guard stats.count >= 2 else { return 0 }
-                                let currentIndex = stats.firstIndex(where: { $0.id == stat.id }) ?? 0
-                                guard currentIndex > 0 else { return 0 }
-                                let prev = stats[currentIndex - 1]
-                                let deltaUsec = Double(stat.cpuUsageUsec - prev.cpuUsageUsec)
-                                let deltaTime = stat.timestamp.timeIntervalSince(prev.timestamp)
-                                guard deltaTime > 0 else { return 0 }
-                                return (deltaUsec / 1_000_000) / deltaTime * 100
-                            },
-                            color: .blue,
-                            formatValue: { stat in
-                                guard stats.count >= 2 else { return "0%" }
-                                let currentIndex = stats.firstIndex(where: { $0.id == stat.id }) ?? 0
-                                guard currentIndex > 0 else { return "0%" }
-                                let prev = stats[currentIndex - 1]
-                                let deltaUsec = Double(stat.cpuUsageUsec - prev.cpuUsageUsec)
-                                let deltaTime = stat.timestamp.timeIntervalSince(prev.timestamp)
-                                guard deltaTime > 0 else { return "0%" }
-                                let percentage = (deltaUsec / 1_000_000) / deltaTime * 100
-                                return String(format: "%.0f%%", percentage)
-                            }
-                        )
-                        .frame(width: chartWidth, height: chartHeight)
+                        chartView(for: configs[0], width: chartWidth, height: chartHeight)
+                        chartView(for: configs[1], width: chartWidth, height: chartHeight)
                     }
-
+                    
                     HStack(spacing: spacing) {
-                        MiniStatChart(
-                            icon: "memorychip",
-                            data: stats,
-                            values: { stat in Double(stat.memoryUsageBytes) },
-                            color: .green,
-                            formatValue: { stat in
-                                let pct = stat.memoryPercentage
-                                return String(format: "%.0f%%", pct)
-                            }
-                        )
-                        .frame(width: chartWidth, height: chartHeight)
-
-                        MiniStatChart(
-                            icon: "network",
-                            data: stats,
-                            values: { stat in Double(stat.networkTotal) },
-                            color: .purple,
-                            formatValue: { stat in Self.formatBytes(stat.networkTotal) }
-                        )
-                        .frame(width: chartWidth, height: chartHeight)
+                        chartView(for: configs[2], width: chartWidth, height: chartHeight)
+                        chartView(for: configs[3], width: chartWidth, height: chartHeight)
                     }
                 }
             }
-            .frame(minWidth: 160, maxWidth: 240, minHeight: 80, maxHeight: 100)
         } else if !stats.isEmpty {
             HStack {
                 ProgressView()
@@ -335,32 +438,99 @@ struct ContainerStatsGridCompact: View {
             }
         }
     }
-
+    
+    private func chartView(for config: ChartConfig, width: CGFloat, height: CGFloat) -> some View {
+        MiniStatChart(
+            title: config.title,
+            icon: config.icon,
+            data: stats,
+            values: config.value,
+            color: config.color,
+            formatValue: config.format,
+            unit: config.unit,
+            size: size
+        )
+        .frame(width: width, height: height)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            onChartSelected?(config.type)
+        }
+    }
+    
     static func formatBytes(_ bytes: Int) -> String {
-        let formatter = ByteCountFormatter()
-        formatter.allowedUnits = [.useKB, .useMB, .useGB]
-        formatter.countStyle = .memory
-        return formatter.string(fromByteCount: Int64(bytes))
+        let units = ["B", "KB", "MB", "GB", "TB", "PB"]
+        var value = Double(bytes)
+        var index = 0
+        
+        while value >= 1024, index < units.count - 1 {
+            value /= 1024
+            index += 1
+        }
+        
+        return String(format: "%.0f %@", value, units[index])
+    }
+}
+
+struct SingleStatChart: View {
+    let containerId: String
+    let type: StatChartType
+    
+    @Environment(ContainerManager.self) private var manager
+    
+    var stats: [ContainerStat] {
+        manager.getStats(for: containerId)
+    }
+    
+    var body: some View {
+        if let config = makeChartConfigs(stats: stats).first(where: { $0.type == type }) {
+            MiniStatChart(
+                title: config.title,
+                icon: config.icon,
+                data: stats,
+                values: config.value,
+                color: config.color,
+                formatValue: config.format,
+                unit: config.unit,
+                size: .enlarged
+            )
+        } else {
+            EmptyView()
+        }
     }
 }
 
 struct MiniStatChart: View {
+    let title: String
     let icon: String
     let data: [ContainerStat]
     let values: (ContainerStat) -> Double
     let color: Color
     let formatValue: (ContainerStat) -> String
+    var unit: Unit = .bytes
+    var size: ContainerStatsGrid.Size = .compact
+    
+    enum Unit {
+        case bytes
+        case percent
+    }
     
     var body: some View {
         GeometryReader { geo in
-            VStack(spacing: 2) {
-                HStack(spacing: 2) {
+            let iconTextSize = max(
+                size == .compact ? 6 : 10,
+                geo.size.width * (size == .compact ? 0.11 : 0.09)
+            )
+            let padding: CGFloat = size == .compact ? 2 : 6
+            let cornerRadius: CGFloat = size == .compact ? 3 : 8
+            
+            VStack(spacing: size == .compact ? 1 : 4) {
+                HStack(spacing: 4) {
                     Image(systemName: icon)
-                        .font(.system(size: max(7, geo.size.width * 0.14)))
+                        .font(.system(size: iconTextSize))
                         .foregroundStyle(color)
                     if let lastStat = data.last {
                         Text(formatValue(lastStat))
-                            .font(.system(size: max(7, geo.size.width * 0.14)))
+                            .font(.system(size: iconTextSize))
                             .foregroundStyle(.secondary)
                             .monospacedDigit()
                             .lineLimit(1)
@@ -368,27 +538,91 @@ struct MiniStatChart: View {
                     }
                 }
                 
-                Chart(Array(data.enumerated()), id: \.element.id) { index, stat in
-                    LineMark(
-                        x: .value("Index", index),
-                        y: .value("Value", values(stat))
-                    )
-                    .foregroundStyle(color)
-                    .interpolationMethod(.monotone)
-                    .lineStyle(StrokeStyle(lineWidth: 1))
-                    
-                    AreaMark(
-                        x: .value("Index", index),
-                        y: .value("Value", values(stat))
-                    )
-                    .foregroundStyle(color.opacity(0.15))
-                    .interpolationMethod(.monotone)
+                chartBody
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                
+                if size == .enlarged {
+                    Text(title)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
                 }
-                .chartXAxis(.hidden)
-                .chartYAxis(.hidden)
             }
-            .padding(3)
-            .background(.background.secondary, in: RoundedRectangle(cornerRadius: 4))
+            .padding(padding)
+            .background(.background.secondary, in: RoundedRectangle(cornerRadius: cornerRadius))
+        }
+    }
+    
+    private var chartBody: some View {
+        let chart = Chart(data, id: \.id) { stat in
+            LineMark(
+                x: .value("Time", stat.timestamp),
+                y: .value("Value", values(stat))
+            )
+            .foregroundStyle(color)
+            .interpolationMethod(.monotone)
+            .lineStyle(StrokeStyle(lineWidth: 1))
+            
+            AreaMark(
+                x: .value("Time", stat.timestamp),
+                y: .value("Value", values(stat))
+            )
+            .foregroundStyle(color.opacity(0.15))
+            .interpolationMethod(.monotone)
+        }
+        
+        if size == .compact {
+            return AnyView(chart
+                .chartXAxis(.hidden)
+                .chartYAxis(.hidden))
+        } else {
+            let configured = chart
+                .chartXAxis {
+                    AxisMarks(values: .automatic(desiredCount: 4)) { value in
+                        AxisGridLine()
+                        AxisValueLabel {
+                            if let date = value.as(Date.self) {
+                                Text(date, format: .dateTime.hour().minute().second())
+                                    .font(.caption2)
+                            }
+                        }
+                    }
+                }
+            
+            switch unit {
+            case .percent:
+                return AnyView(configured
+                    .chartYScale(domain: 0...100)
+                    .chartYAxis {
+                        yAxisMarks(values: .stride(by: 25))
+                    })
+            case .bytes:
+                return AnyView(configured
+                    .chartYScale(domain: .automatic(includesZero: true))
+                    .chartYAxis {
+                        yAxisMarks(values: .automatic(desiredCount: 4))
+                    })
+            }
+        }
+    }
+    
+    private func yAxisMarks(values: AxisMarkValues) -> some AxisContent {
+        AxisMarks(position: .leading, values: values) { value in
+            AxisGridLine()
+            AxisValueLabel {
+                if let val = value.as(Double.self) {
+                    Text(formatAxisValue(val))
+                        .font(.caption2)
+                }
+            }
+        }
+    }
+    
+    private func formatAxisValue(_ value: Double) -> String {
+        switch unit {
+        case .bytes:
+            return ContainerStatsGrid.formatBytes(Int(value))
+        case .percent:
+            return String(format: "%.0f%%", value)
         }
     }
 }
