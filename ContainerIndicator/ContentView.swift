@@ -3,6 +3,7 @@ import Charts
 
 struct ContentView: View {
     @Environment(ContainerManager.self) private var manager
+    @State private var isPresentingCreateContainer = false
     
     var body: some View {
         VStack(spacing: 0) {
@@ -34,6 +35,13 @@ struct ContentView: View {
                         Task { await manager.stopSystem() }
                     } label: {
                         Label(String(localized: "content.stop_service"), systemImage: "stop.circle")
+                    }
+                    .controlSize(.regular)
+                    
+                    Button {
+                        isPresentingCreateContainer = true
+                    } label: {
+                        Label(String(localized: "content.create_container"), systemImage: "plus.circle")
                     }
                     .controlSize(.regular)
                 } else {
@@ -132,114 +140,13 @@ struct ContentView: View {
                 .background(.orange.opacity(0.1))
             }
         }
+        .sheet(isPresented: $isPresentingCreateContainer) {
+            CreateContainerView()
+        }
         .frame(minWidth: 650, minHeight: 400)
         .task {
             await manager.silentCheckSystemStatus()
         }
-    }
-}
-
-struct ContainerRow: View {
-    @Environment(ContainerManager.self) private var manager
-    let container: ContainerInfo
-    
-    var body: some View {
-        HStack(alignment: .center, spacing: 10) {
-            Image(systemName: "cube")
-                .foregroundStyle(container.status == .running ? .green : .gray)
-                .font(.title3)
-                .frame(width: 24)
-            
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text(container.name)
-                        .fontWeight(.medium)
-                    if container.status == .running {
-                        Text(container.statusText)
-                            .font(.caption2)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(.green.opacity(0.2))
-                            .foregroundStyle(.green)
-                            .clipShape(Capsule())
-                    } else {
-                        Text(container.statusText)
-                            .font(.caption2)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(.secondary.opacity(0.15))
-                            .foregroundStyle(.secondary)
-                            .clipShape(Capsule())
-                    }
-                }
-                
-                Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 2) {
-                    GridRow {
-                        Text(String(localized: "label.image"))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Text(container.image)
-                            .font(.caption)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                    }
-                    if !container.hostname.isEmpty {
-                        GridRow {
-                            Text(String(localized: "label.hostname"))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Text(container.hostname)
-                                .font(.caption)
-                        }
-                    }
-                    GridRow {
-                        Text(String(localized: "label.platform"))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Text(container.platform)
-                            .font(.caption)
-                    }
-                    GridRow {
-                        Text(String(localized: "label.cpu_memory"))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Text("\(String(localized: "label.cores \(container.totalCpus)")) / \(container.memoryFormatted)")
-                            .font(.caption)
-                    }
-                }
-            }
-            
-            Spacer(minLength: 0)
-            
-            if container.status == .running {
-                ContainerStatsGridCompact(containerId: container.id)
-                    .frame(width: 150, height: 72)
-                    .layoutPriority(1)
-            }
-            
-            VStack {
-                if container.status == .running {
-                    Button(String(localized: "container.stop")) {
-                        Task { await manager.stopContainer(container) }
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    Button(String(localized: "container.restart")) {
-                        Task { await manager.restartContainer(container) }
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                } else {
-                    Button(String(localized: "container.start")) {
-                        Task { await manager.startContainer(container) }
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                }
-            }
-        }
-        .padding(.horizontal)
-        .padding(.vertical, 8)
     }
 }
 
@@ -319,6 +226,123 @@ private func makeChartConfigs(stats: [ContainerStat]) -> [ChartConfig] {
             format: { stat in ContainerStatsGrid.formatBytes(stat.networkTotal) }
         )
     ]
+}
+
+struct ContainerRow: View {
+    @Environment(ContainerManager.self) private var manager
+    let container: ContainerInfo
+    @State private var showDeleteConfirmation = false
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 10) {
+            Image(systemName: "cube")
+                .foregroundStyle(container.status == .running ? .green : .gray)
+                .font(.title3)
+                .frame(width: 24)
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(container.name)
+                        .fontWeight(.medium)
+                    if container.status == .running {
+                        Text(container.statusText)
+                            .font(.caption2)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(.green.opacity(0.2))
+                            .foregroundStyle(.green)
+                            .clipShape(Capsule())
+                    } else {
+                        Text(container.statusText)
+                            .font(.caption2)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(.secondary.opacity(0.15))
+                            .foregroundStyle(.secondary)
+                            .clipShape(Capsule())
+                    }
+                }
+
+                Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 2) {
+                    GridRow {
+                        Text(String(localized: "label.image"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(container.image)
+                            .font(.caption)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+                    if !container.hostname.isEmpty {
+                        GridRow {
+                            Text(String(localized: "label.hostname"))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(container.hostname)
+                                .font(.caption)
+                        }
+                    }
+                    GridRow {
+                        Text(String(localized: "label.platform"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(container.platform)
+                            .font(.caption)
+                    }
+                    GridRow {
+                        Text(String(localized: "label.cpu_memory"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text("\(String(localized: "label.cores \(container.totalCpus)")) / \(container.memoryFormatted)")
+                            .font(.caption)
+                    }
+                }
+            }
+
+            if container.status == .running {
+                ContainerStatsGridCompact(containerId: container.id)
+                    .frame(minWidth: 169, maxWidth: 480)
+            }
+
+            Spacer(minLength: 0)
+
+            VStack {
+                if container.status == .running {
+                    Button(String(localized: "container.stop")) {
+                        Task { await manager.stopContainer(container) }
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    Button(String(localized: "container.restart")) {
+                        Task { await manager.restartContainer(container) }
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                } else {
+                    Button(String(localized: "container.start")) {
+                        Task { await manager.startContainer(container) }
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    Button(String(localized: "container.delete")) {
+                        showDeleteConfirmation = true
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+            }
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+        .alert(String(localized: "dialog.delete_container_title"), isPresented: $showDeleteConfirmation) {
+            Button(String(localized: "dialog.delete"), role: .destructive) {
+                Task { await manager.deleteContainer(container) }
+            }
+            Button(String(localized: "dialog.cancel"), role: .cancel) { }
+        } message: {
+            Text(String(localized: "dialog.delete_container_message \(container.name)"))
+        }
+    }
 }
 
 struct ContainerStatsGridCompact: View {
@@ -643,8 +667,6 @@ struct MachineRow: View {
             
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
-                    Text(machine.name)
-                        .fontWeight(.medium)
                     if machine.isDefault {
                         Text(String(localized: "label.default"))
                             .font(.caption2)

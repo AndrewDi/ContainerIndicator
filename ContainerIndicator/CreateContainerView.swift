@@ -3,59 +3,87 @@ import SwiftUI
 struct CreateContainerView: View {
     @Environment(ContainerManager.self) private var manager
     @Environment(\.dismiss) private var dismiss
-    
+
     @State private var parameters = ContainerCreateParameters()
     @State private var newArgument = ""
-    
+
     private var isValid: Bool {
-        !parameters.image.trimmingCharacters(in: .whitespaces).isEmpty
+        !trimmed(parameters.image).isEmpty
     }
-    
+
     var body: some View {
         NavigationStack {
             Form {
                 Section(String(localized: "dialog.basic")) {
-                    TextField(String(localized: "dialog.image"), text: $parameters.image)
+                    Picker(String(localized: "dialog.image"), selection: $parameters.image) {
+                        Text(String(localized: "dialog.select_image")).tag("")
+                        ForEach(manager.availableImages) { image in
+                            Text(image.reference).tag(image.reference)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    
                     TextField(String(localized: "dialog.name"), text: $parameters.name)
                 }
-                
+
                 Section(String(localized: "dialog.resources")) {
-                    TextField(String(localized: "dialog.cpus"), text: $parameters.cpus)
-                    TextField(String(localized: "dialog.memory"), text: $parameters.memory)
+                    Picker(String(localized: "dialog.cpus"), selection: $parameters.cpus) {
+                        Text(String(localized: "dialog.ulimited")).tag("")
+                        ForEach(1...12, id: \.self) { cpu in
+                            Text("\(cpu)").tag("\(cpu)")
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    
+                    Picker(String(localized: "dialog.memory"), selection: $parameters.memory) {
+                        Text(String(localized: "dialog.ulimited")).tag("")
+                        Text("128 MB").tag("128m")
+                        Text("256 MB").tag("256m")
+                        Text("512 MB").tag("512m")
+                        Text("1 GB").tag("1g")
+                        Text("2 GB").tag("2g")
+                        Text("4 GB").tag("4g")
+                        Text("8 GB").tag("8g")
+                        Text("16 GB").tag("16g")
+                    }
+                    .pickerStyle(.menu)
                 }
-                
+
                 Section(String(localized: "dialog.environment")) {
                     EditableListView(items: $parameters.environmentVariables, placeholder: "KEY=value")
                 }
-                
+
                 Section(String(localized: "dialog.ports")) {
                     EditableListView(
                         items: $parameters.publish,
                         placeholder: "[host-ip:]host-port:container-port[/protocol]"
                     )
                 }
-                
+
                 Section(String(localized: "dialog.volumes")) {
                     EditableListView(items: $parameters.volumes, placeholder: "/host:/container")
                 }
-                
+
                 Section(String(localized: "dialog.arguments")) {
                     argumentInput
                 }
-                
+
                 DisclosureGroup(String(localized: "dialog.advanced")) {
                     advancedSection
                 }
             }
             .formStyle(.grouped)
             .navigationTitle(String(localized: "dialog.create_container"))
+            .task {
+                await manager.refreshAvailableImages()
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(String(localized: "dialog.cancel")) {
                         dismiss()
                     }
                 }
-                
+
                 ToolbarItem(placement: .confirmationAction) {
                     Button(String(localized: "dialog.create")) {
                         Task {
@@ -69,13 +97,13 @@ struct CreateContainerView: View {
         }
         .frame(minWidth: 520, minHeight: 640)
     }
-    
+
     private var argumentInput: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 TextField("argument", text: $newArgument)
                 Button {
-                    let value = newArgument.trimmingCharacters(in: .whitespaces)
+                    let value = trimmed(newArgument)
                     guard !value.isEmpty else { return }
                     parameters.arguments.append(value)
                     newArgument = ""
@@ -83,9 +111,9 @@ struct CreateContainerView: View {
                     Image(systemName: "plus.circle")
                 }
                 .buttonStyle(.borderless)
-                .disabled(newArgument.trimmingCharacters(in: .whitespaces).isEmpty)
+                .disabled(trimmed(newArgument).isEmpty)
             }
-            
+
             ForEach(Array(parameters.arguments.enumerated()), id: \.offset) { index, arg in
                 HStack {
                     Text(arg)
@@ -101,7 +129,7 @@ struct CreateContainerView: View {
             }
         }
     }
-    
+
     @ViewBuilder
     private var advancedSection: some View {
         Section(String(localized: "dialog.process_options")) {
@@ -114,7 +142,7 @@ struct CreateContainerView: View {
             TextField("Working Directory", text: $parameters.workdir)
             EditableListView(items: $parameters.ulimits, placeholder: "<type>=<soft>[:<hard>]")
         }
-        
+
         Section(String(localized: "dialog.management_options")) {
             TextField("Architecture", text: $parameters.arch)
             EditableListView(items: $parameters.capAdd, placeholder: "CAP_NET_RAW")
@@ -146,14 +174,18 @@ struct CreateContainerView: View {
             Toggle("Virtualization", isOn: $parameters.virtualization)
         }
     }
+
+    private func trimmed(_ value: String) -> String {
+        value.trimmingCharacters(in: CharacterSet.whitespaces)
+    }
 }
 
 struct EditableListView: View {
     @Binding var items: [String]
     var placeholder: String = ""
-    
+
     @State private var newValue = ""
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(Array(items.enumerated()), id: \.offset) { index, item in
@@ -169,11 +201,11 @@ struct EditableListView: View {
                     .buttonStyle(.borderless)
                 }
             }
-            
+
             HStack {
                 TextField(placeholder, text: $newValue)
                 Button {
-                    let value = newValue.trimmingCharacters(in: .whitespaces)
+                    let value = newValue.trimmingCharacters(in: CharacterSet.whitespaces)
                     guard !value.isEmpty else { return }
                     items.append(value)
                     newValue = ""
@@ -181,7 +213,7 @@ struct EditableListView: View {
                     Image(systemName: "plus.circle")
                 }
                 .buttonStyle(.borderless)
-                .disabled(newValue.trimmingCharacters(in: .whitespaces).isEmpty)
+                .disabled(newValue.trimmingCharacters(in: CharacterSet.whitespaces).isEmpty)
             }
         }
     }

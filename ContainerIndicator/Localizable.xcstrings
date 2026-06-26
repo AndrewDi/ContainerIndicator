@@ -33,6 +33,116 @@
         }
       }
     },
+    "%lld" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld"
+          }
+        }
+      }
+    },
+    "1 GB" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 GB"
+          }
+        }
+      }
+    },
+    "2 GB" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "2 GB"
+          }
+        }
+      }
+    },
+    "4 GB" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "4 GB"
+          }
+        }
+      }
+    },
+    "8 GB" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "8 GB"
+          }
+        }
+      }
+    },
+    "16 GB" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "16 GB"
+          }
+        }
+      }
+    },
+    "128 MB" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "128 MB"
+          }
+        }
+      }
+    },
+    "256 MB" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "256 MB"
+          }
+        }
+      }
+    },
+    "512 MB" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "512 MB"
+          }
+        }
+      }
+    },
+    "Architecture" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "架构"
+          }
+        }
+      }
+    },
+    "argument" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "参数"
+          }
+        }
+      }
+    },
     "chart.cpu" : {
       "localizations" : {
         "en" : {
@@ -97,6 +207,16 @@
         }
       }
     },
+    "CID File" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CID 文件"
+          }
+        }
+      }
+    },
     "Container" : {
       "localizations" : {
         "en" : {
@@ -125,6 +245,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "CPU: %lld"
+          }
+        }
+      }
+    },
+    "container.delete" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除"
           }
         }
       }
@@ -269,6 +399,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "容器: %lld"
+          }
+        }
+      }
+    },
+    "content.create_container" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "创建容器"
           }
         }
       }
@@ -449,6 +589,252 @@
         }
       }
     },
+    "Detach" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "分离 (Detach)"
+          }
+        }
+      }
+    },
+    "dialog.advanced" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "高级"
+          }
+        }
+      }
+    },
+    "dialog.arguments" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "启动参数"
+          }
+        }
+      }
+    },
+    "dialog.basic" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "基本"
+          }
+        }
+      }
+    },
+    "dialog.cancel" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消"
+          }
+        }
+      }
+    },
+    "dialog.cpus" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CPU核数"
+          }
+        }
+      }
+    },
+    "dialog.create" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "创建"
+          }
+        }
+      }
+    },
+    "dialog.create_container" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "创建容器"
+          }
+        }
+      }
+    },
+    "dialog.delete" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除"
+          }
+        }
+      }
+    },
+    "dialog.delete_container_message %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "确定要删除容器 %@ 吗？此操作无法撤销。"
+          }
+        }
+      }
+    },
+    "dialog.delete_container_title" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除容器"
+          }
+        }
+      }
+    },
+    "dialog.environment" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "环境变量"
+          }
+        }
+      }
+    },
+    "dialog.image" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "镜像"
+          }
+        }
+      }
+    },
+    "dialog.management_options" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "管理参数"
+          }
+        }
+      }
+    },
+    "dialog.memory" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "内存"
+          }
+        }
+      }
+    },
+    "dialog.name" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "名称"
+          }
+        }
+      }
+    },
+    "dialog.ports" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "端口"
+          }
+        }
+      }
+    },
+    "dialog.process_options" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "处理参数"
+          }
+        }
+      }
+    },
+    "dialog.resources" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "资源"
+          }
+        }
+      }
+    },
+    "dialog.select_image" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择镜像"
+          }
+        }
+      }
+    },
+    "dialog.ulimited" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unlimited"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "不限制"
+          }
+        }
+      }
+    },
+    "dialog.volumes" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "数据卷"
+          }
+        }
+      }
+    },
+    "DNS Domain" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DNS域名"
+          }
+        }
+      }
+    },
+    "Entrypoint" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "入口点 (Entrypoint)"
+          }
+        }
+      }
+    },
     "error.command_failed %@" : {
       "localizations" : {
         "en" : {
@@ -497,13 +883,42 @@
         }
       }
     },
-    "Index" : {
-      "extractionState" : "stale",
+    "GID" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "索引"
+            "value" : "GID"
+          }
+        }
+      }
+    },
+    "Init Image" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Init镜像"
+          }
+        }
+      }
+    },
+    "Interactive" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "交互式"
+          }
+        }
+      }
+    },
+    "Kernel" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "内核"
           }
         }
       }
@@ -966,6 +1381,106 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "容器服务状态: %@"
+          }
+        }
+      }
+    },
+    "Network" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网络"
+          }
+        }
+      }
+    },
+    "No DNS" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "禁用DNS"
+          }
+        }
+      }
+    },
+    "notification.container_create_failed_body %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法创建容器 %@。"
+          }
+        }
+      }
+    },
+    "notification.container_create_failed_title" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "创建容器失败"
+          }
+        }
+      }
+    },
+    "notification.container_created_body %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "容器 %@ 已成功创建。"
+          }
+        }
+      }
+    },
+    "notification.container_created_title" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "容器已创建"
+          }
+        }
+      }
+    },
+    "notification.container_delete_failed_body %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法删除容器 %@。"
+          }
+        }
+      }
+    },
+    "notification.container_delete_failed_title" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除容器失败"
+          }
+        }
+      }
+    },
+    "notification.container_deleted_body %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "容器 %@ 已成功删除。"
+          }
+        }
+      }
+    },
+    "notification.container_deleted_title" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "容器已删除"
           }
         }
       }
@@ -1458,6 +1973,86 @@
         }
       }
     },
+    "OS" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "操作系统"
+          }
+        }
+      }
+    },
+    "Platform" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "平台"
+          }
+        }
+      }
+    },
+    "Read Only" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只读"
+          }
+        }
+      }
+    },
+    "Remove on Stop" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停止时移除"
+          }
+        }
+      }
+    },
+    "Rosetta" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rosetta"
+          }
+        }
+      }
+    },
+    "Runtime" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "运行时"
+          }
+        }
+      }
+    },
+    "SHM Size" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "共享内存大小"
+          }
+        }
+      }
+    },
+    "SSH Forward" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SSH 转发"
+          }
+        }
+      }
+    },
     "status.running" : {
       "localizations" : {
         "en" : {
@@ -1523,7 +2118,54 @@
       }
     },
     "Time" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "时间"
+          }
+        }
+      }
+    },
+    "TTY" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TTY"
+          }
+        }
+      }
+    },
+    "UID" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "UID"
+          }
+        }
+      }
+    },
+    "Use Init" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用 Init"
+          }
+        }
+      }
+    },
+    "User" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用户"
+          }
+        }
+      }
     },
     "Value" : {
       "localizations" : {
@@ -1531,6 +2173,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "值"
+          }
+        }
+      }
+    },
+    "Virtualization" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "虚拟化"
+          }
+        }
+      }
+    },
+    "Working Directory" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "工作目录"
           }
         }
       }

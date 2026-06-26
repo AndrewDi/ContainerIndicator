@@ -9,6 +9,7 @@ class ContainerManager {
     var containers: [ContainerInfo] = []
     var machines: [MachineInfo] = []
     var containerStats: [String: [ContainerStat]] = [:]
+    var availableImages: [ImageInfo] = []
     var isLoading = false
     var errorMessage: String?
     
@@ -323,6 +324,32 @@ class ContainerManager {
         }
     }
     
+    func refreshAvailableImages() async {
+        guard let commandPath = containerPath else { return }
+        do {
+            let result = try await executeCommand(commandPath, arguments: ["image", "list", "--format", "json"])
+            if result.exitCode == 0 && !result.output.isEmpty {
+                if let data = result.output.data(using: .utf8),
+                   let jsonArray = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
+                    
+                    let newImages = jsonArray.compactMap { item -> ImageInfo? in
+                        guard let id = item["id"] as? String else { return nil }
+                        
+                        let configuration = item["configuration"] as? [String: Any]
+                        let name = configuration?["name"] as? String ?? ""
+                        
+                        guard !name.isEmpty else { return nil }
+                        
+                        return ImageInfo(id: id, reference: name)
+                    }
+                    availableImages = newImages
+                }
+            }
+        } catch {
+            // Ignore errors
+        }
+    }
+    
     func startSystem() async {
         await executeContainerCommand(
             ["system", "start"],
@@ -392,6 +419,16 @@ class ContainerManager {
         }
     }
     
+    func deleteContainer(_ container: ContainerInfo) async {
+        await executeContainerCommand(
+            ["rm", container.id],
+            successTitle: String(localized: "notification.container_deleted_title"),
+            successBody: String(localized: "notification.container_deleted_body \(container.name)"),
+            failureTitle: String(localized: "notification.container_delete_failed_title"),
+            failureBody: String(localized: "notification.container_delete_failed_body \(container.name)")
+        )
+    }
+    
     func startMachine(_ machine: MachineInfo) async {
         await executeContainerCommand(
             ["machine", "run", "-n", machine.name, "-d"],
@@ -439,6 +476,54 @@ class ContainerManager {
                 body: String(localized: "notification.machine_restarted_body \(machine.name)")
             )
         }
+    }
+    
+    func createContainer(_ parameters: ContainerCreateParameters) async {
+        var arguments = ["run", "-d"]
+        
+        if !parameters.name.isEmpty {
+            arguments.append("--name")
+            arguments.append(parameters.name)
+        }
+        
+        if !parameters.cpus.isEmpty {
+            arguments.append("--cpus")
+            arguments.append(parameters.cpus)
+        }
+        
+        if !parameters.memory.isEmpty {
+            arguments.append("--memory")
+            arguments.append(parameters.memory)
+        }
+        
+        for env in parameters.environmentVariables where !env.isEmpty {
+            arguments.append("--env")
+            arguments.append(env)
+        }
+        
+        for port in parameters.publish where !port.isEmpty {
+            arguments.append("--publish")
+            arguments.append(port)
+        }
+        
+        for volume in parameters.volumes where !volume.isEmpty {
+            arguments.append("--volume")
+            arguments.append(volume)
+        }
+        
+        arguments.append(parameters.image)
+        
+        for arg in parameters.arguments where !arg.isEmpty {
+            arguments.append(arg)
+        }
+        
+        await executeContainerCommand(
+            arguments,
+            successTitle: String(localized: "notification.container_created_title"),
+            successBody: String(localized: "notification.container_created_body \(parameters.name)"),
+            failureTitle: String(localized: "notification.container_create_failed_title"),
+            failureBody: String(localized: "notification.container_create_failed_body \(parameters.name)")
+        )
     }
     
     @discardableResult
@@ -539,6 +624,11 @@ struct CommandResult {
     let exitCode: Int
     let output: String
     let error: String
+}
+
+struct ImageInfo: Identifiable, Hashable {
+    let id: String
+    let reference: String
 }
 
 struct ContainerStat: Identifiable {
