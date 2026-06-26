@@ -448,7 +448,8 @@ struct ContainerStatsGrid: View {
             color: config.color,
             formatValue: config.format,
             unit: config.unit,
-            size: size
+            size: size,
+            showsXAxis: false
         )
         .frame(width: width, height: height)
         .contentShape(Rectangle())
@@ -491,7 +492,8 @@ struct SingleStatChart: View {
                 color: config.color,
                 formatValue: config.format,
                 unit: config.unit,
-                size: .enlarged
+                size: .enlarged,
+                showsXAxis: true
             )
         } else {
             EmptyView()
@@ -508,6 +510,7 @@ struct MiniStatChart: View {
     let formatValue: (ContainerStat) -> String
     var unit: Unit = .bytes
     var size: ContainerStatsGrid.Size = .compact
+    var showsXAxis: Bool = false
     
     enum Unit {
         case bytes
@@ -547,8 +550,8 @@ struct MiniStatChart: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            .padding(padding)
-            .background(.background.secondary, in: RoundedRectangle(cornerRadius: cornerRadius))
+                .padding(padding)
+                .background(.background.secondary, in: RoundedRectangle(cornerRadius: cornerRadius))
         }
     }
     
@@ -570,7 +573,7 @@ struct MiniStatChart: View {
             .interpolationMethod(.monotone)
         }
         
-        if size == .compact {
+        if size == .compact || !showsXAxis {
             return AnyView(chart
                 .chartXAxis(.hidden)
                 .chartYAxis(.hidden))
