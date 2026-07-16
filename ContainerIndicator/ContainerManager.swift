@@ -550,9 +550,7 @@ class ContainerManager {
     ) async -> Bool {
         guard let commandPath = containerPath else {
             errorMessage = String(localized: "error.command_not_found")
-            if showNotification {
-                sendNotification(title: failureTitle, body: failureBody)
-            }
+            sendNotification(title: failureTitle, body: failureBody)
             return false
         }
         
@@ -569,16 +567,12 @@ class ContainerManager {
                 return true
             } else {
                 errorMessage = String(localized: "error.command_failed \(result.error)")
-                if showNotification {
-                    sendNotification(title: failureTitle, body: failureBody)
-                }
+                sendNotification(title: failureTitle, body: failureBody)
                 return false
             }
         } catch {
             errorMessage = String(localized: "error.execution_failed \(error.localizedDescription)")
-            if showNotification {
-                sendNotification(title: failureTitle, body: failureBody)
-            }
+            sendNotification(title: failureTitle, body: failureBody)
             return false
         }
     }
