@@ -1,2 +1,14 @@
+# Xcode
 *.xcodeproj
+*.xcworkspace
+xcuserdata/
+DerivedData/
+build/
 *.dmg
+
+# MiMoCode / Claude
+.mimocode/
+.claude/
+
+# macOS
+.DS_Store

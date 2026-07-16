@@ -276,49 +276,62 @@ class ContainerManager {
     
     private func silentRefreshMachines() async {
         guard systemStatus == .running, let commandPath = containerPath else { return }
-        
+
         do {
-            let result = try await executeCommand(commandPath, arguments: ["machine", "inspect"])
-            
-            if result.exitCode == 0 && !result.output.isEmpty {
-                if let data = result.output.data(using: .utf8),
-                   let jsonArray = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
-                    
-                    let newMachines = jsonArray.compactMap { item -> MachineInfo? in
-                        guard let id = item["id"] as? String,
-                              let status = item["status"] as? String else { return nil }
-                        
-                        let createdDate = item["createdDate"] as? String ?? ""
-                        let cpus = item["cpus"] as? Int ?? 0
-                        let memory = item["memory"] as? Int ?? 0
-                        let diskSize = item["diskSize"] as? Int ?? 0
-                        let isDefault = item["default"] as? Bool ?? false
-                        
-                        let image = item["image"] as? [String: Any]
-                        let imageRef = image?["reference"] as? String ?? ""
-                        
-                        let platform = item["platform"] as? [String: Any]
-                        let architecture = platform?["architecture"] as? String ?? ""
-                        let os = platform?["os"] as? String ?? ""
-                        
-                        return MachineInfo(
-                            id: id, name: id,
-                            status: status.lowercased() == "running" ? .running : .stopped,
-                            statusText: status, createdDate: createdDate,
-                            cpus: cpus, memory: memory, diskSize: diskSize,
-                            isDefault: isDefault,
-                            imageReference: imageRef,
-                            platformArchitecture: architecture,
-                            platformOS: os
-                        )
-                    }
-                    
-                    if machines != newMachines {
-                        machines = newMachines
-                    }
-                }
-            } else {
+            let listResult = try await executeCommand(commandPath, arguments: ["machine", "list", "--format", "json"])
+
+            guard listResult.exitCode == 0,
+                  !listResult.output.isEmpty,
+                  let listData = listResult.output.data(using: .utf8),
+                  let listArray = try? JSONSerialization.jsonObject(with: listData) as? [[String: Any]] else {
                 if !machines.isEmpty { machines = [] }
+                return
+            }
+
+            var newMachines: [MachineInfo] = []
+
+            for item in listArray {
+                guard let id = item["id"] as? String,
+                      let status = item["status"] as? String else { continue }
+
+                let createdDate = item["createdDate"] as? String ?? ""
+                let cpus = item["cpus"] as? Int ?? 0
+                let memory = item["memory"] as? Int ?? 0
+                let diskSize = item["diskSize"] as? Int ?? 0
+                let isDefault = item["default"] as? Bool ?? false
+
+                var imageRef = ""
+                var architecture = ""
+                var osName = ""
+
+                if let inspectResult = try? await executeCommand(commandPath, arguments: ["machine", "inspect", id]),
+                   inspectResult.exitCode == 0,
+                   let inspectData = inspectResult.output.data(using: .utf8),
+                   let inspectArray = try? JSONSerialization.jsonObject(with: inspectData) as? [[String: Any]],
+                   let inspectDict = inspectArray.first {
+
+                    let image = inspectDict["image"] as? [String: Any]
+                    imageRef = image?["reference"] as? String ?? ""
+
+                    let platform = inspectDict["platform"] as? [String: Any]
+                    architecture = platform?["architecture"] as? String ?? ""
+                    osName = platform?["os"] as? String ?? ""
+                }
+
+                newMachines.append(MachineInfo(
+                    id: id, name: id,
+                    status: status.lowercased() == "running" ? .running : .stopped,
+                    statusText: status, createdDate: createdDate,
+                    cpus: cpus, memory: memory, diskSize: diskSize,
+                    isDefault: isDefault,
+                    imageReference: imageRef,
+                    platformArchitecture: architecture,
+                    platformOS: osName
+                ))
+            }
+
+            if machines != newMachines {
+                machines = newMachines
             }
         } catch {
         }

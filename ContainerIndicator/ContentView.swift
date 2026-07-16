@@ -667,6 +667,8 @@ struct MachineRow: View {
             
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
+                    Text(machine.id)
+                        .fontWeight(.medium)
                     if machine.isDefault {
                         Text(String(localized: "label.default"))
                             .font(.caption2)
@@ -695,13 +697,16 @@ struct MachineRow: View {
                     }
                 }
                 
-                Text(machine.id)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                
                 Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 2) {
+                    GridRow {
+                        Text(String(localized: "label.image"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(machine.imageReference)
+                            .font(.caption)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
                     GridRow {
                         Text(String(localized: "label.cpu"))
                             .font(.caption)
@@ -714,6 +719,13 @@ struct MachineRow: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Text(machine.memoryFormatted)
+                            .font(.caption)
+                    }
+                    GridRow {
+                        Text(String(localized: "label.platform"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(machine.platform)
                             .font(.caption)
                     }
                     GridRow {
