@@ -471,22 +471,28 @@ class ContainerManager {
             failureBody: String(localized: "notification.machine_restart_failed_body \(machine.name)"),
             showNotification: false
         )
-        
+
         guard stopped else { return }
-        
-        let started = await executeContainerCommand(
-            ["machine", "run", "-n", machine.name, "-d"],
-            successTitle: "",
-            successBody: "",
-            failureTitle: String(localized: "notification.machine_restart_failed_title"),
-            failureBody: String(localized: "notification.machine_restart_failed_body \(machine.name)"),
-            showNotification: false
-        )
-        
-        if started {
+
+        guard let commandPath = containerPath else { return }
+
+        isLoading = true
+        defer { isLoading = false }
+
+        _ = try? await executeCommand(commandPath, arguments: ["machine", "run", "-n", machine.name, "-d"])
+
+        await silentRefreshMachines()
+
+        if let refreshed = machines.first(where: { $0.id == machine.id }),
+           refreshed.status == .running {
             sendNotification(
                 title: String(localized: "notification.machine_restarted_title"),
                 body: String(localized: "notification.machine_restarted_body \(machine.name)")
+            )
+        } else {
+            sendNotification(
+                title: String(localized: "notification.machine_restart_failed_title"),
+                body: String(localized: "notification.machine_restart_failed_body \(machine.name)")
             )
         }
     }
